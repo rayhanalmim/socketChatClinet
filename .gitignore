@@ -6,3 +6,8 @@ node_modules/
 
 public
 /public
+
+./bun.lockb
+bun.lockb
+/bun.lockb
+.bun.lockb
