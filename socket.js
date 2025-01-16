@@ -1,27 +1,164 @@
+import Channel from '#models/channel/channelModel.js';
+import Message from '#models/messages/messagesModel.js';
+import ChannelUser from '#models/channelUser/channelUserModel.js';
+import User from '#models/users/userModel.js';
+import jwt from 'jsonwebtoken';
+
+const { verify } = jwt;
+
 const socketHandler = (io) => {
-  io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
+  const anthillChat = io.of('/anthillChat'); // Create a namespace
 
-    // Handle joining a room (e.g., channel)
-    socket.on('join_room', (roomId) => {
-      socket.join(roomId);
-      console.log(`User ${socket.id} joined room: ${roomId}`);
-      io.to(roomId).emit('user_joined', { userId: socket.id });
+  anthillChat.on('connection', (socket) => {
+    console.log(`User connected to anthillChat namespace: ${socket.id}`);
+
+    // Middleware for authentication
+    socket.use(async (packet, next) => {
+      const token = socket.handshake.auth.token;
+      if (!token) {
+        return next(new Error('Authentication error'));
+      }
+      try {
+        const decoded = verify(token, process.env.JWT_SECRET);
+
+        const user = await User.findById(decoded.id).select('-password');
+
+        if (!user) {
+          return next(new Error('Authentication error'));
+        }
+        socket.userId = user._id;
+        socket.username = user.name;
+        next();
+      } catch (error) {
+        next(new Error('Authentication error'));
+      }
     });
 
-    // Handle messages
-    socket.on('send_message', ({ roomId, message }) => {
-      console.log(`Message from ${socket.id} in room ${roomId}: ${message}`);
-      io.to(roomId).emit('receive_message', {
-        userId: socket.id,
-        message,
-        timestamp: new Date(),
-      });
+    /**
+     * Join a Channel
+     */
+    socket.on('join_channel', async ({ channelId }) => {
+      try {
+        const channel = await Channel.findById(channelId);
+
+        if (!channel) {
+          socket.emit('error', 'Channel not found');
+          return;
+        }
+
+        const channelUser = await ChannelUser.findOne({
+          channelId,
+          userId: socket.userId,
+        });
+
+        if (!channelUser) {
+          socket.emit('error', 'You are not a member of this channel');
+          return;
+        }
+
+        socket.join(channelId);
+        console.log(`User ${socket.userId} joined channel ${channelId}`);
+
+        // Fetch last 50 messages
+        const messages = await Message.find({ channelId })
+          .sort({ createdAt: -1 })
+          .limit(50)
+          .populate('senderId', 'username avatar');
+
+        socket.emit('message_history', messages);
+        anthillChat.to(channelId).emit('user_joined', {
+          userId: socket.userId,
+          username: socket.username,
+        });
+      } catch (error) {
+        console.error('Error joining channel:', error.message);
+      }
     });
 
-    // Handle disconnection
+    /**
+     * Send a Message
+     */
+    socket.on(
+      'send_message',
+      async ({
+        channelId,
+        content,
+        messageType = 'text',
+        attachments = [],
+      }) => {
+        try {
+          const channelUser = await ChannelUser.findOne({
+            channelId,
+            userId: socket.userId,
+          });
+
+          if (!channelUser) {
+            socket.emit('error', 'You are not a member of this channel');
+            return;
+          }
+
+          const message = new Message({
+            channelId,
+            senderId: socket.userId,
+            content,
+            messageType,
+            attachments,
+          });
+
+          await message.save();
+          const populatedMessage = await message.populate(
+            'senderId',
+            'username avatar',
+          );
+
+          anthillChat.to(channelId).emit('receive_message', populatedMessage);
+          console.log(
+            `Message sent in channel ${channelId} by user ${socket.userId}`,
+          );
+        } catch (error) {
+          console.error('Error sending message:', error.message);
+        }
+      },
+    );
+
+    /**
+     * Typing Indicator
+     */
+    socket.on('typing', ({ channelId }) => {
+      socket.to(channelId).emit('typing', { userId: socket.userId });
+    });
+
+    socket.on('stop_typing', ({ channelId }) => {
+      socket.to(channelId).emit('stop_typing', { userId: socket.userId });
+    });
+
+    /**
+     * Private Messaging (Direct Message)
+     */
+    socket.on('private_message', async ({ recipientId, content }) => {
+      try {
+        const message = new Message({
+          senderId: socket.userId,
+          recipientId,
+          content,
+          messageType: 'text',
+        });
+
+        await message.save();
+        const populatedMessage = await message.populate('senderId', 'name');
+
+        anthillChat.to(recipientId).emit('private_message', populatedMessage);
+        console.log(`DM sent to user ${recipientId} by user ${socket.userId}`);
+      } catch (error) {
+        console.error('Error sending private message:', error.message);
+      }
+    });
+
+    /**
+     * Handle Disconnection
+     */
     socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.id}`);
+      console.log(`User disconnected from anthillChat namespace: ${socket.id}`);
     });
   });
 };

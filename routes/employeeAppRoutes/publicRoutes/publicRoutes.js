@@ -13,4 +13,6 @@ const publicRoutes = Router()
 
 publicRoutes.use('/auth', authRoutes({ router: publicRoutes, models, sendForgotPasswordMail, folderName: 'projectName/employee' }))
 
+publicRoutes.use('/',)
+
 export default publicRoutes
