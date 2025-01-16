@@ -1,6 +1,6 @@
 import asyncHandler from 'express-async-handler';
 
-import ChannelUserModel from '#models/channelUser/channelUserModel';
+import ChannelUserModel from '#models/channelUser/channelUserModel.js';
 
 const createChannelUser = asyncHandler(async (req, res) => {
   const { channelId, userId } = req.body;
@@ -33,4 +33,10 @@ const createChannelUser = asyncHandler(async (req, res) => {
   }
 });
 
-export { createChannelUser };
+const getChannelUsers = asyncHandler(async (req, res) => {
+  const channelUsers = await ChannelUserModel.find({});
+
+  res.json(channelUsers);
+});
+
+export { createChannelUser, getChannelUsers };

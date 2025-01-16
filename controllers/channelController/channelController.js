@@ -62,6 +62,16 @@ const getChannelById = asyncHandler(async (req, res) => {
   }
 });
 
+const getChannelByUserId = asyncHandler(async (req, res) => {
+  const channel = await Channel.findOne({ user: req.params.id });
+  if (channel) {
+    res.json(channel);
+  } else {
+    res.status(404);
+    throw new Error('Channel not found');
+  }
+});
+
 const updateChannel = asyncHandler(async (req, res) => {
   const { name, description } = req.body;
   const channel = await Channel.findById(req.params.id);
@@ -82,4 +92,10 @@ const updateChannel = asyncHandler(async (req, res) => {
   }
 });
 
-export { createChannel, getChannels, getChannelById, updateChannel };
+export {
+  createChannel,
+  getChannels,
+  getChannelById,
+  updateChannel,
+  getChannelByUserId,
+};
