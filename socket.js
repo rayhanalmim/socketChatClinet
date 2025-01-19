@@ -1,10 +1,7 @@
 import Channel from '#models/channel/channelModel.js';
 import Message from '#models/messages/messagesModel.js';
 import ChannelUser from '#models/channelUser/channelUserModel.js';
-import User from '#models/users/userModel.js';
-import jwt from 'jsonwebtoken';
 
-const { verify } = jwt;
 
 const socketHandler = (io) => {
   const anthillChat = io.of('/anthillChat'); // Create a namespace
@@ -12,33 +9,12 @@ const socketHandler = (io) => {
   anthillChat.on('connection', (socket) => {
     console.log(`User connected to anthillChat namespace: ${socket.id}`);
 
-    // Middleware for authentication
-    socket.use(async (packet, next) => {
-      const token = socket.handshake.auth.token;
-      if (!token) {
-        return next(new Error('Authentication error'));
-      }
-      try {
-        const decoded = verify(token, process.env.JWT_SECRET);
-
-        const user = await User.findById(decoded.id).select('-password');
-
-        if (!user) {
-          return next(new Error('Authentication error'));
-        }
-        socket.userId = user._id;
-        socket.username = user.name;
-        next();
-      } catch (error) {
-        next(new Error('Authentication error'));
-      }
-    });
-
     /**
      * Join a Channel
      */
     socket.on('join_channel', async ({ channelId }) => {
       try {
+        console.log("hitttttttttttttttt")
         const channel = await Channel.findById(channelId);
 
         if (!channel) {
@@ -105,13 +81,9 @@ const socketHandler = (io) => {
             attachments,
           });
 
-          await message.save();
-          const populatedMessage = await message.populate(
-            'senderId',
-            'username avatar',
-          );
+        
 
-          anthillChat.to(channelId).emit('receive_message', populatedMessage);
+          anthillChat.to(channelId).emit('receive_message', message);
           console.log(
             `Message sent in channel ${channelId} by user ${socket.userId}`,
           );

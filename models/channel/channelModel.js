@@ -15,10 +15,9 @@ const channelSchema = new Schema(
       type: Boolean,
       default: false, // Public by default
     },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'Channel must have a creator'],
+    isActive: {
+      type: Boolean,
+      default: true,
     },
   },
   {
