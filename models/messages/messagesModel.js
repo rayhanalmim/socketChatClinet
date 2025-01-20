@@ -12,6 +12,9 @@ const messageSchema = new Schema(
       ref: 'User',
       required: [true, 'Sender ID is required'],
     },
+    senderName : {
+      type: String,
+    },
     recipientId: {
       type: Schema.Types.ObjectId,
       ref: 'User', // Used for direct messages
@@ -29,13 +32,6 @@ const messageSchema = new Schema(
       type: [String], // Array of file URLs
       default: [],
     },
-
-    //if needed in v2
-    // readBy: {
-    //   type: [Schema.Types.ObjectId], // Array of user IDs who read the message
-    //   ref: 'User',
-    //   default: [],
-    // },
   },
   {
     timestamps: true,
