@@ -28,4 +28,25 @@ const searchEmployee = asyncHandler(async (req, res) => {
   }
 });
 
-export { searchEmployee };
+// Fetch all employees
+const getAllEmployees = asyncHandler(async (req, res) => {
+  try {
+    // Find all employees
+    const employees = await Employee.find();
+
+    if (!employees.length) {
+      return res.status(200).json({ message: "No employees found" });
+    }
+
+    // Return the employees as JSON
+    return res.status(200).json(employees);
+  } catch (error) {
+    console.error("Error fetching employees:", error);
+    return res.status(500).json({ message: "Error fetching employees", error: error.message });
+  }
+});
+
+export { 
+  searchEmployee,
+  getAllEmployees
+ };

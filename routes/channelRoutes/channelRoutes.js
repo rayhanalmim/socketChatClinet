@@ -7,7 +7,7 @@ channelRoutes.route('/createChannel').post(createChannel);
 channelRoutes.route('/channels').get(getAllChannels);
 channelRoutes.route('/getChannelsByUserID/:id').get(getChannelByUserId);
 channelRoutes.route('/addChannelMember').post(inviteChannel);
-channelRoutes.route('/getChannelMember/:channelId').get(getChannelUsers);
+channelRoutes.route('/getChannelMember/:userId').get(getChannelUsers);
 
 
 export default channelRoutes;

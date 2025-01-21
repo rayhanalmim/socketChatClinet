@@ -15,7 +15,6 @@ const socketHandler = (io) => {
     // Join a channel
     socket.on('join_channel', async ({ channelId, userId }) => {
       try {
-        console.log('testing now :', channelId, userId);
         // Leave previous channel if user was in one
         socket.rooms.forEach((room) => {
           if (room !== socket.id) {
@@ -30,7 +29,6 @@ const socketHandler = (io) => {
           return;
         }
 
-        console.log('testing 2: ', channel);
         const channelUser = await ChannelUser.findOne({ channelId, userId });
         if (!channelUser) {
           socket.emit('error', 'You are not a member of this channel');
@@ -63,7 +61,6 @@ const socketHandler = (io) => {
      */
     socket.on('leave_channel', async ({ channelId, userId }) => {
       try {
-        console.log(`User ${userId} is leaving channel ${channelId}`);
 
         // Remove the user from the socket room
         socket.leave(channelId);
@@ -108,7 +105,6 @@ const socketHandler = (io) => {
 
           const user = await Employee.findById(userId);
 
-          console.log('Channel user found:', channelUser);
 
           if (!channelUser) {
             socket.emit('error', 'You are not a member of this channel');
@@ -128,7 +124,6 @@ const socketHandler = (io) => {
           // Save the message to the database
           await message.save();
 
-          console.log('Message saved:', message);
 
           // Broadcast the message to the channel
           anthillChat.to(channelId).emit('receive_message', message);
@@ -144,16 +139,10 @@ const socketHandler = (io) => {
      * Typing Indicator
      */
     socket.on('typing', async ({ channelId, userId }) => {
-      console.log('before typing: ', userId);
 
       const user = await Employee.findById(userId);
-      console.log(user);
       socket.to(channelId).emit('typing', { userId: userId, name: user.name });
-      console.log(
-        'user typingxxxxxxxxxxxxxxxxxxxxxxxxxxx: ',
-        user.name,
-        userId,
-      );
+   
     });
 
     socket.on('stop_typing', async ({ channelId, userId }) => {
@@ -172,14 +161,16 @@ const socketHandler = (io) => {
         const conversationId = [senderId, recipientId].sort().join('_');
 
         socket.join(conversationId);
+        console.log("user joined the dm", senderId, recipientId)
 
-        const messages = await Message.find
-          .find({ conversationId })
+        const messages = await Message.find({ conversationId })
           .sort({ createdAt: -1 })
           .limit(50);
         // .select('senderName content messageType createdAt');
 
         socket.emit('private_message_history', messages);
+
+        console.log(`User ${senderId} joined private conversation with ${recipientId}, messeges: ${messages}`);
       } catch (error) {
         console.error('Error joining private conversation:', error.message);
       }
@@ -198,10 +189,8 @@ const socketHandler = (io) => {
         });
 
         await message.save();
-        const populatedMessage = await message.populate('senderId');
 
-        anthillChat.to(recipientId).emit('send_dm', populatedMessage);
-        anthillChat.to(senderId).emit('send_dm', populatedMessage);
+        anthillChat.to(conversationId).emit('recive_dm', message);
       } catch (error) {
         console.error('Error sending private message:', error.message);
       }

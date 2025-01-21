@@ -1,7 +1,6 @@
 import asyncHandler from "express-async-handler";
 import Channel from "#models/channel/channelModel.js";
 import ChannelUser from "#models/channelUser/channelUserModel.js";
-import Employee from "#models/authModels/employeeModel.js";
 
 const createChannel = asyncHandler(async (req, res) => {
   const { name, description, isPrivate } = req.body;
@@ -153,40 +152,35 @@ const inviteChannel = asyncHandler(async (req, res) => {
   }
 });
 
+// Fetch channels the user has joined
 const getChannelUsers = asyncHandler(async (req, res) => {
   try {
-    const { channelId } = req.params;
+    const { userId } = req.params;
 
-    // Validate channelId
-    if (!channelId) {
-      return res.status(400).json({ message: 'Channel ID is required' });
+    console.log(userId)
+
+    if (!userId) {
+      res.status(400).json({ message: 'User ID is required' });
+      return;
     }
 
-    // Find all users linked to the channel
-    const channelUsers = await ChannelUser.find({ channelId });
+    // Find all channel IDs where the user has joined
+    const joinedChannels = await ChannelUser.find({ userId }).select('channelId');
 
-    if (!channelUsers.length) {
-      return res.status(404).json({ message: 'No users found for this channel' });
+    if (!joinedChannels.length) {
+      res.status(200).json([]); // Return empty array if user hasn't joined any channels
+      return;
     }
 
-    // Extract user IDs
-    const userIds = channelUsers.map((cu) => cu.userId);
+    const channelIds = joinedChannels.map((entry) => entry.channelId);
 
-    // Fetch employee data for the extracted user IDs
-    const employees = await Employee.find({ _id: { $in: userIds } }).select(
-      'name email level image'
-    );
+    // Fetch the channel details based on the channel IDs
+    const channels = await Channel.find({ _id: { $in: channelIds } });
 
-    res.status(200).json({
-      message: 'Users fetched successfully',
-      data: employees,
-    });
+    res.status(200).json(channels);
   } catch (error) {
-    console.error('Error fetching users for channel:', error);
-    res.status(500).json({
-      message: 'An error occurred while fetching users for the channel',
-      error,
-    });
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching channels', error: error.message });
   }
 });
 
