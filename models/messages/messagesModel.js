@@ -44,6 +44,22 @@ const messageSchema = new Schema(
       type: [String], // Array of file URLs
       default: [],
     },
+    reactions: {
+      type: [
+        {
+          userId: {
+            type: Schema.Types.ObjectId,
+            ref: 'User',
+            required: true,
+          },
+          reaction: {
+            type: String,
+            required: true,
+          },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt fields

@@ -17,10 +17,11 @@ connectDB();
 
 const app = express();
 const server = createServer(app); // Create HTTP server instance
+
 const io = new Server(server, {
   cors: {
     origin: '*', // Adjust this to restrict origins in production
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
   },
 });
 
