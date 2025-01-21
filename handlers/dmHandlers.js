@@ -16,7 +16,7 @@ export const handleDMEvents = (socket, anthillChat) => {
     }
   });
 
-  socket.on("send_dm", async ({ senderId, recipientId, content }) => {
+  socket.on("send_dm", async ({ senderId, recipientId, content, senderName }) => {
     try {
       if (
         !mongoose.Types.ObjectId.isValid(senderId) ||
@@ -27,6 +27,7 @@ export const handleDMEvents = (socket, anthillChat) => {
       const conversationId = createConversationId(senderId, recipientId);
       const message = new Message({
         senderId,
+        senderName,
         recipientId,
         content,
         messageType: "text",
