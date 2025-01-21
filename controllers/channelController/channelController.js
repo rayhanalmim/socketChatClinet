@@ -1,6 +1,7 @@
 import asyncHandler from "express-async-handler";
 import Channel from "#models/channel/channelModel.js";
 import ChannelUser from "#models/channelUser/channelUserModel.js";
+import Employee from "#models/authModels/employeeModel.js";
 
 const createChannel = asyncHandler(async (req, res) => {
   const { name, description, isPrivate } = req.body;
@@ -152,8 +153,45 @@ const inviteChannel = asyncHandler(async (req, res) => {
   }
 });
 
-// Fetch channels the user has joined
 const getChannelUsers = asyncHandler(async (req, res) => {
+  try {
+    const { channelId } = req.params;
+
+    // Validate channelId
+    if (!channelId) {
+      return res.status(400).json({ message: 'Channel ID is required' });
+    }
+
+    // Find all users linked to the channel
+    const channelUsers = await ChannelUser.find({ channelId });
+
+    if (!channelUsers.length) {
+      return res.status(404).json({ message: 'No users found for this channel' });
+    }
+
+    // Extract user IDs
+    const userIds = channelUsers.map((cu) => cu.userId);
+
+    // Fetch employee data for the extracted user IDs
+    const employees = await Employee.find({ _id: { $in: userIds } }).select(
+      'name email level image'
+    );
+
+    res.status(200).json({
+      message: 'Users fetched successfully',
+      data: employees,
+    });
+  } catch (error) {
+    console.error('Error fetching users for channel:', error);
+    res.status(500).json({
+      message: 'An error occurred while fetching users for the channel',
+      error,
+    });
+  }
+});
+
+
+const getDmUser = asyncHandler(async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -192,5 +230,6 @@ export {
   updateChannel,
   getChannelByUserId,
   inviteChannel,
-  getChannelUsers
+  getChannelUsers,
+  getDmUser
 };

@@ -33,6 +33,8 @@ export const handleDMEvents = (socket, anthillChat) => {
         conversationId,
       });
 
+      console.log("message", message);
+
       await message.save();
       anthillChat.to(conversationId).emit("recived_dm", message);
     } catch (error) {

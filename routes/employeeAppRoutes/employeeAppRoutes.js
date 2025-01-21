@@ -10,6 +10,6 @@ const employeeAppRoutes = Router()
 employeeAppRoutes.use('/public', publicRoutes)
 employeeAppRoutes.use('/protected', protectForEmployee, protectedRoutes)
 employeeAppRoutes.route('/search').get(searchEmployee)
-employeeAppRoutes.route('/getAllEmployees').get(getAllEmployees)
+employeeAppRoutes.route('/getAllEmployees/:userId').get(getAllEmployees)
 
 export default employeeAppRoutes
