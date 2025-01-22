@@ -43,9 +43,8 @@ const messageSchema = new Schema(
       enum: ['text', 'image', 'video', 'file'],
       default: 'text',
     },
-    attachments: {
-      type: [String], // Array of file URLs
-      default: [],
+    attachment: {
+      type: String,
     },
     reactions: {
       type: [

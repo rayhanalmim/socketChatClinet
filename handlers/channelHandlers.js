@@ -4,6 +4,7 @@ import Message from '#models/messages/messagesModel.js';
 import ChannelUser from '#models/channelUser/channelUserModel.js';
 import Employee from '#models/authModels/employeeModel.js';
 import { fetchMessages, handleError } from './utils.js';
+import { uploadObject } from '#config/space.js';
 
 export const handleChannelEvents = (socket, anthillChat) => {
   socket.on('join_channel', async ({ channelId, userId }) => {
@@ -63,23 +64,40 @@ export const handleChannelEvents = (socket, anthillChat) => {
       content,
       userId,
       messageType = 'text',
-      attachments = [],
+      attachment = null, // Single file attachment
     }) => {
       try {
+        // Validate channel ID
         if (!mongoose.Types.ObjectId.isValid(channelId)) {
           throw new Error('Invalid Channel ID');
         }
 
+        // Check if the user is a member of the channel
         const channelUser = await ChannelUser.findOne({ channelId, userId });
         if (!channelUser) {
           throw new Error('You are not a member of this channel');
         }
 
+        // Fetch user details
         const user = await Employee.findById(userId);
         if (!user) {
           throw new Error('User not found');
         }
 
+        // Handle file attachment (if provided)
+        let attachmentUrl = null;
+        if (attachment && messageType !== 'text') {
+          // Generate a unique file path
+          const filePath = `antschat/${Date.now()}-${attachment.name}`;
+
+          // Upload the file to S3 using your existing `uploadObject` function
+          await uploadObject(filePath, attachment.data);
+
+          // Store the file URL in the `attachment` field
+          attachmentUrl = filePath; // Or the full S3 URL if `uploadObject` returns it
+        }
+
+        // Create and save the message
         const message = new Message({
           channelId,
           senderId: userId,
@@ -87,11 +105,12 @@ export const handleChannelEvents = (socket, anthillChat) => {
           senderName: user.name,
           content,
           messageType,
-          attachments,
+          attachment: attachmentUrl, // Save the file URL (or null if no attachment)
         });
 
         await message.save();
 
+        // Emit the message to the channel
         anthillChat.to(channelId).emit('receive_message', message);
         console.log(`Message sent in channel ${channelId} by ${userId}`);
       } catch (error) {
