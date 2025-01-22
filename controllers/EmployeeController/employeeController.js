@@ -31,6 +31,8 @@ const searchEmployee = asyncHandler(async (req, res) => {
 // Fetch all employees
 const getAllEmployees = asyncHandler(async (req, res) => {
   try {
+    const { userId } = req.params;
+
     // Find all employees
     const employees = await Employee.find();
 
@@ -38,13 +40,17 @@ const getAllEmployees = asyncHandler(async (req, res) => {
       return res.status(200).json({ message: "No employees found" });
     }
 
-    // Return the employees as JSON
-    return res.status(200).json(employees);
+    // Filter out the employee with the matching userId (senderId)
+    const filteredEmployees = employees.filter(employee => employee._id.toString() !== userId);
+
+    // Return the filtered employees as JSON
+    return res.status(200).json(filteredEmployees);
   } catch (error) {
     console.error("Error fetching employees:", error);
     return res.status(500).json({ message: "Error fetching employees", error: error.message });
   }
 });
+
 
 export { 
   searchEmployee,
