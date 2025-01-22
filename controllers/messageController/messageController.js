@@ -6,6 +6,8 @@ const updateGroupMessage = asyncHandler(async (req, res) => {
     const { channelId, messageId } = req.params;
     const { content } = req.body;
 
+    console.log("check", channelId, messageId, content);
+
     if (!content || !content.trim()) {
       return res.status(400).json({ message: "Message content is required." });
     }
