@@ -9,7 +9,7 @@ channelRoutes.route('/getChannelsByUserID/:id').get(getChannelByUserId);
 channelRoutes.route('/addChannelMember').post(inviteChannel);
 channelRoutes.route('/getChannelMember/:channelId').get(getChannelUsers);
 channelRoutes.route('/getDmUser/:userId').get(getDmUser);
-channelRoutes.route('/search').get(searchChannelAndEmployee);
+channelRoutes.route('/search/:userId').get(searchChannelAndEmployee);
 
 
 export default channelRoutes;

@@ -225,16 +225,40 @@ const getDmUser = asyncHandler(async (req, res) => {
 const searchChannelAndEmployee = asyncHandler(async (req, res) => {
   try {
     const { searchQuery } = req.query;
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
+
     const regex = new RegExp(searchQuery, 'i'); // Case-insensitive regex
-    const channels = await Channel.find({ name: regex });
+
+    // Find all channel IDs where the user has joined
+    const joinedChannels = await ChannelUser.find({ userId }).select('channelId');
+    if (!joinedChannels.length) {
+      return res.status(200).json({ channels: [], employees: [] }); // No channels joined
+    }
+
+    const channelIds = joinedChannels.map((entry) => entry.channelId);
+
+    // Fetch channels matching the searchQuery within the filtered channel IDs
+    const channels = await Channel.find({
+      _id: { $in: channelIds },
+      name: regex,
+    });
+
+    // Fetch employees matching the searchQuery
     const employees = await Employee.find({ name: regex });
 
-    res.status(200).json({ channels, employees });
+    return res.status(200).json({ channels, employees });
   } catch (error) {
     console.error('Error searching:', error);
-    res.status(500).json({ message: 'Server error.' });
+    return res.status(500).json({ message: 'Server error.' });
   }
 });
+
+
 
 export {
   createChannel,

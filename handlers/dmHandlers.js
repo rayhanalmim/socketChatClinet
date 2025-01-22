@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Message from '#models/messages/messagesModel.js';
 import { createConversationId, fetchMessages, handleError } from './utils.js';
 import { uploadObject } from '#config/space.js';
+import Employee from '#models/authModels/employeeModel.js';
 
 export const handleDMEvents = (socket, anthillChat) => {
   socket.on('join_dm', async ({ conversationId }) => {
@@ -38,9 +39,13 @@ export const handleDMEvents = (socket, anthillChat) => {
           attachmentUrl = filePath;
         }
 
+        const user = await Employee.findById(senderId);
+
         // Create and save the message
         const message = new Message({
           senderId,
+          senderName: user.name,
+          senderImage: user.dp,
           recipientId,
           content,
           messageType,

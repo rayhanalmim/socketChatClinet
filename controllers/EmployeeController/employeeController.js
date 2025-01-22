@@ -28,7 +28,6 @@ const searchEmployee = asyncHandler(async (req, res) => {
   }
 });
 
-// Fetch all employees
 const getAllEmployees = asyncHandler(async (req, res) => {
   try {
     const { userId } = req.params;
