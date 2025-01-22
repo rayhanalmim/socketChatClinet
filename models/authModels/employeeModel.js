@@ -20,7 +20,7 @@ const employeeSchema = Schema({
         enum: ['superAdmin', 'admin', 'employee'],
         required: [true, 'Please add a Level']
     },
-    image: {
+    dp: {
         type: String
     }
 }, {

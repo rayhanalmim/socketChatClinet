@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Message from "#models/messages/messagesModel.js";
 import { createConversationId, fetchMessages, handleError } from "./utils.js";
+import Employee from "#models/authModels/employeeModel.js";
 
 export const handleDMEvents = (socket, anthillChat) => {
   socket.on("join_dm", async ({ conversationId }) => {
@@ -25,9 +26,12 @@ export const handleDMEvents = (socket, anthillChat) => {
         throw new Error("Invalid user IDs");
       }
       const conversationId = createConversationId(senderId, recipientId);
+      const employee = await Employee.findById(senderId);
+      
       const message = new Message({
         senderId,
         senderName,
+        senderImage : employee.dp,
         recipientId,
         content,
         messageType: "text",

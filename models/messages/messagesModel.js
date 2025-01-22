@@ -18,6 +18,9 @@ const messageSchema = new Schema(
     senderName: {
       type: String,
     },
+    senderImage : {
+      type : String,
+    },
     // For direct messages
     recipientId: {
       type: Schema.Types.ObjectId,

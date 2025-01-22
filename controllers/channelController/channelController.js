@@ -222,6 +222,20 @@ const getDmUser = asyncHandler(async (req, res) => {
   }
 });
 
+const searchChannelAndEmployee = asyncHandler(async (req, res) => {
+  try {
+    const { searchQuery } = req.query;
+    const regex = new RegExp(searchQuery, 'i'); // Case-insensitive regex
+    const channels = await Channel.find({ name: regex });
+    const employees = await Employee.find({ name: regex });
+
+    res.status(200).json({ channels, employees });
+  } catch (error) {
+    console.error('Error searching:', error);
+    res.status(500).json({ message: 'Server error.' });
+  }
+});
+
 export {
   createChannel,
   getAllChannels,
@@ -231,5 +245,6 @@ export {
   getChannelByUserId,
   inviteChannel,
   getChannelUsers,
-  getDmUser
+  getDmUser,
+  searchChannelAndEmployee
 };

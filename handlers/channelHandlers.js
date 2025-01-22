@@ -83,6 +83,7 @@ export const handleChannelEvents = (socket, anthillChat) => {
         const message = new Message({
           channelId,
           senderId: userId,
+          senderImage : user.dp,
           senderName: user.name,
           content,
           messageType,
