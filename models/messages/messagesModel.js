@@ -36,7 +36,6 @@ const messageSchema = new Schema(
     // Message content and type
     content: {
       type: String,
-      required: [true, 'Message content is required'],
     },
     messageType: {
       type: String,
