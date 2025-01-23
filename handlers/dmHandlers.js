@@ -1,26 +1,32 @@
 /* eslint-disable no-undef */
-import mongoose from "mongoose";
-import Message from "#models/messages/messagesModel.js";
-import { createConversationId, fetchMessages, handleError } from "./utils.js";
-import { uploadBuffer } from "#config/space.js";
-import Employee from "#models/authModels/employeeModel.js";
+import mongoose from 'mongoose';
+import Message from '#models/messages/messagesModel.js';
+import {
+  createConversationId,
+  fetchMessages,
+  handleError,
+  updateCache,
+} from './utils.js';
+import { uploadBuffer } from '#config/space.js';
+import Employee from '#models/authModels/employeeModel.js';
+import redisClient from './../redisClient.js';
 export const handleDMEvents = (socket, anthillChat) => {
-  socket.on("join_dm", async ({ conversationId }) => {
+  socket.on('join_dm', async ({ conversationId }) => {
     try {
       socket.join(conversationId);
 
-      console.log("user joined dm", conversationId);
+      console.log('user joined dm', conversationId);
       const messages = await fetchMessages({ conversationId });
-      console.log("messages", messages);
-      socket.emit("private_message_history", messages);
+      console.log('messages', messages);
+      socket.emit('private_message_history', messages);
     } catch (error) {
-      handleError(socket, error, "Failed to join the private conversation");
+      handleError(socket, error, 'Failed to join the private conversation');
     }
   });
 
   // Handle direct message with file upload
   socket.on(
-    "send_dm",
+    'send_dm',
     async ({ senderId, recipientId, content, attachmentData, messageType }) => {
       try {
         // Validate user IDs
@@ -28,9 +34,8 @@ export const handleDMEvents = (socket, anthillChat) => {
           !mongoose.Types.ObjectId.isValid(senderId) ||
           !mongoose.Types.ObjectId.isValid(recipientId)
         ) {
-          throw new Error("Invalid user IDs");
+          throw new Error('Invalid user IDs');
         }
-
 
         console.log('attachment should be hit', attachmentData.attachment);
 
@@ -41,18 +46,16 @@ export const handleDMEvents = (socket, anthillChat) => {
 
         // Handle attachment (if provided)
         if (attachmentData.attachment) {
-          console.log("Full attachment object:", attachmentData.attachment);
+          console.log('Full attachment object:', attachmentData.attachment);
 
           // Decode base64 string to buffer
-          const buffer = Buffer.from(attachmentData.attachment.data, "base64");
-        
-
+          const buffer = Buffer.from(attachmentData.attachment.data, 'base64');
 
           // Upload file to DigitalOcean Spaces
           const result = await uploadBuffer(
             attachmentData.filePath,
             buffer,
-            attachmentData.attachment.mimetype
+            attachmentData.attachment.mimetype,
           );
 
           attachmentUrl = result;
@@ -61,7 +64,7 @@ export const handleDMEvents = (socket, anthillChat) => {
         // Retrieve sender's information
         const user = await Employee.findById(senderId);
         if (!user) {
-          throw new Error("Sender not found");
+          throw new Error('Sender not found');
         }
 
         // Create and save the message
@@ -82,15 +85,20 @@ export const handleDMEvents = (socket, anthillChat) => {
 
         // Increment unread message count for the recipient
         await redisClient.hincrby(`unread:${conversationId}`, recipientId, 1);
-        const unreadCount = await redisClient.hget(`unread:${conversationId}`, recipientId);
-        anthillChat.to(recipientId).emit('unread_count', { conversationId, count: unreadCount });
+        const unreadCount = await redisClient.hget(
+          `unread:${conversationId}`,
+          recipientId,
+        );
+        anthillChat
+          .to(recipientId)
+          .emit('unread_count', { conversationId, count: unreadCount });
 
         // Emit the message to the conversation room
-        anthillChat.to(conversationId).emit("recived_dm", message);
+        anthillChat.to(conversationId).emit('recived_dm', message);
       } catch (error) {
         console.error(error);
-        handleError(socket, error, "Failed to send the direct message");
+        handleError(socket, error, 'Failed to send the direct message');
       }
-    }
+    },
   );
 };
