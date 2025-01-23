@@ -1,8 +1,9 @@
 import mongoose from 'mongoose';
 import Message from '#models/messages/messagesModel.js';
-import { createConversationId, fetchMessages, handleError } from './utils.js';
+import { createConversationId, fetchMessages, handleError, updateCache } from './utils.js';
 import { uploadObject } from '#config/space.js';
 import Employee from '#models/authModels/employeeModel.js';
+import redisClient from '../redisClient.js'; // Import redisClient
 
 export const handleDMEvents = (socket, anthillChat) => {
   socket.on('join_dm', async ({ conversationId }) => {
@@ -54,6 +55,14 @@ export const handleDMEvents = (socket, anthillChat) => {
         });
 
         await message.save();
+
+        // Update cache
+        await updateCache({ conversationId }, message);
+
+        // Increment unread message count for the recipient
+        await redisClient.hincrby(`unread:${conversationId}`, recipientId, 1);
+        const unreadCount = await redisClient.hget(`unread:${conversationId}`, recipientId);
+        anthillChat.to(recipientId).emit('unread_count', { conversationId, count: unreadCount });
 
         anthillChat.to(conversationId).emit('recived_dm', message);
       } catch (error) {

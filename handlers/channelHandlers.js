@@ -3,8 +3,9 @@ import Channel from '#models/channel/channelModel.js';
 import Message from '#models/messages/messagesModel.js';
 import ChannelUser from '#models/channelUser/channelUserModel.js';
 import Employee from '#models/authModels/employeeModel.js';
-import { fetchMessages, handleError } from './utils.js';
+import { fetchMessages, handleError, updateCache } from './utils.js';
 import { uploadObject } from '#config/space.js';
+import redisClient from '../redisClient.js'; // Import redisClient
 
 export const handleChannelEvents = (socket, anthillChat) => {
   socket.on('join_channel', async ({ channelId, userId }) => {
@@ -109,6 +110,19 @@ export const handleChannelEvents = (socket, anthillChat) => {
         });
 
         await message.save();
+
+        // Update cache
+        await updateCache({ channelId }, message);
+
+        // Increment unread message count for the channel members
+        const channelMembers = await ChannelUser.find({ channelId });
+        for (const member of channelMembers) {
+          if (member.userId.toString() !== userId) {
+            await redisClient.hincrby(`unread:${channelId}`, member.userId.toString(), 1);
+            const unreadCount = await redisClient.hget(`unread:${channelId}`, member.userId.toString());
+            anthillChat.to(member.userId.toString()).emit('unread_count', { channelId, count: unreadCount });
+          }
+        }
 
         // Emit the message to the channel
         anthillChat.to(channelId).emit('receive_message', message);
