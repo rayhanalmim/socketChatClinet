@@ -3,7 +3,6 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
-
 export async function uploadObject(key, file, mimetype) {
   const client = new S3Client({
     endpoint: 'https://sgp1.digitaloceanspaces.com',
@@ -122,3 +121,33 @@ export async function updateObject(createKey, file, deleteKey, mimetype) {
     console.log('Error', err);
   }
 }
+
+// Function to upload buffer to DigitalOcean Spaces
+export async function uploadBuffer(key, fileBuffer, mimetype) {
+  const client = new S3Client({
+    endpoint: 'https://sgp1.digitaloceanspaces.com',
+    region: 'sgp1',
+    credentials: {
+      accessKeyId: process.env.ACCESS_KEY_ID,
+      secretAccessKey: process.env.SPACES_SECRET,
+    },
+  });
+
+  const uploadParams = {
+    Bucket: process.env.BUCKET,
+    Key: key,
+    Body: fileBuffer, // Using buffer directly
+    ACL: 'public-read', // Make file publicly accessible
+    ContentType: mimetype || 'application/octet-stream',
+  };
+
+  try {
+    await client.send(new PutObjectCommand(uploadParams));
+    console.log(`Successfully uploaded file to: ${uploadParams.Bucket}/${uploadParams.Key}`);
+    return uploadParams.Key; // Return upload result
+  } catch (err) {
+    console.error('Error uploading buffer:', err.message);
+    throw new Error('Failed to upload file to DigitalOcean Spaces');
+  }
+}
+

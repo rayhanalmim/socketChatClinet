@@ -73,6 +73,9 @@ export const handleChannelEvents = (socket, anthillChat) => {
           throw new Error('Invalid Channel ID');
         }
 
+
+        console.log('all', channelId, content, userId, messageType, attachment);
+
         // Check if the user is a member of the channel
         const channelUser = await ChannelUser.findOne({ channelId, userId });
         if (!channelUser) {
