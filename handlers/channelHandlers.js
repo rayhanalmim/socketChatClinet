@@ -4,8 +4,9 @@ import Channel from "#models/channel/channelModel.js";
 import Message from "#models/messages/messagesModel.js";
 import ChannelUser from "#models/channelUser/channelUserModel.js";
 import Employee from "#models/authModels/employeeModel.js";
-import { fetchMessages, handleError } from "./utils.js";
-import { uploadBuffer, uploadObject } from "#config/space.js";
+import { fetchMessages, handleError, updateCache } from "./utils.js";
+import { uploadBuffer } from "#config/space.js";
+import redisClient from "./../redisClient.js";
 
 export const handleChannelEvents = (socket, anthillChat) => {
   socket.on("join_channel", async ({ channelId, userId }) => {
