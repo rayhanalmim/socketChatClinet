@@ -31,7 +31,6 @@ export const handleDMEvents = (socket, anthillChat) => {
           throw new Error("Invalid user IDs");
         }
 
-
         console.log('attachment should be hit', attachmentData.attachment);
 
         // Generate conversation ID
