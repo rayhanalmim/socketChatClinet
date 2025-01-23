@@ -33,7 +33,6 @@ export const handleChannelEvents = (socket, anthillChat) => {
 
       socket.join(channelId);
 
-      console.log(`User ${userId} joined channel ${channelId}`);
 
       const messages = await fetchMessages({ channelId });
       socket.emit("message_history", messages);
@@ -50,7 +49,6 @@ export const handleChannelEvents = (socket, anthillChat) => {
     try {
       if (!channelId) throw new Error("Channel ID is required");
 
-      console.log(`User ${userId} leaving channel ${channelId}`);
       socket.leave(channelId);
 
       anthillChat.to(channelId).emit("user_left", { userId });
@@ -90,7 +88,6 @@ export const handleChannelEvents = (socket, anthillChat) => {
 
         // Handle attachment (if provided)
         if (attachmentData.attachment) {
-          console.log("Full attachment object:", attachmentData.attachment);
 
           // Decode base64 string to buffer
           const buffer = Buffer.from(attachmentData.attachment.data, "base64");

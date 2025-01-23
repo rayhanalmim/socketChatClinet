@@ -15,9 +15,7 @@ export const handleDMEvents = (socket, anthillChat) => {
     try {
       socket.join(conversationId);
 
-      console.log('user joined dm', conversationId);
       const messages = await fetchMessages({ conversationId });
-      console.log('messages', messages);
       socket.emit('private_message_history', messages);
     } catch (error) {
       handleError(socket, error, 'Failed to join the private conversation');
@@ -37,7 +35,6 @@ export const handleDMEvents = (socket, anthillChat) => {
           throw new Error('Invalid user IDs');
         }
 
-        console.log('attachment should be hit', attachmentData.attachment);
 
         // Generate conversation ID
         const conversationId = createConversationId(senderId, recipientId);
@@ -46,7 +43,6 @@ export const handleDMEvents = (socket, anthillChat) => {
 
         // Handle attachment (if provided)
         if (attachmentData.attachment) {
-          console.log('Full attachment object:', attachmentData.attachment);
 
           // Decode base64 string to buffer
           const buffer = Buffer.from(attachmentData.attachment.data, 'base64');
