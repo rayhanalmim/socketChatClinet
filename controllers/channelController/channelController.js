@@ -251,7 +251,9 @@ const searchChannelAndEmployee = asyncHandler(async (req, res) => {
     // Fetch employees matching the searchQuery
     const employees = await Employee.find({ name: regex });
 
-    return res.status(200).json({ channels, employees });
+    const filteredEmployees = employees.filter(employee => employee._id.toString() !== userId);
+
+    return res.status(200).json({ channels, employees : filteredEmployees });
   } catch (error) {
     console.error('Error searching:', error);
     return res.status(500).json({ message: 'Server error.' });

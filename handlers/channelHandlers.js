@@ -116,7 +116,7 @@ export const handleChannelEvents = (socket, anthillChat) => {
             );
             anthillChat
               .to(member.userId.toString())
-              .emit('unread_count', { channelId, count: unreadCount });
+              .emit('unread_counts', { channelId, count: unreadCount });
           }
         }
 
