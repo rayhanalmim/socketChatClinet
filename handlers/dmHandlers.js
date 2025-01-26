@@ -33,10 +33,10 @@ export const handleDMEvents = (socket, anthillChat) => {
         ) {
           throw new Error("Invalid user IDs");
         }
-
+  
         const conversationId = createConversationId(senderId, recipientId);
         let attachmentUrl = null;
-
+  
         if (attachmentData?.attachment) {
           const buffer = Buffer.from(attachmentData.attachment.data, "base64");
           const result = await uploadBuffer(
@@ -46,12 +46,12 @@ export const handleDMEvents = (socket, anthillChat) => {
           );
           attachmentUrl = result;
         }
-
+  
         const user = await Employee.findById(senderId);
         if (!user) {
           throw new Error("Sender not found");
         }
-
+  
         const message = new Message({
           senderId,
           senderName: user.name,
@@ -62,13 +62,13 @@ export const handleDMEvents = (socket, anthillChat) => {
           conversationId,
           attachment: attachmentUrl,
         });
-
+  
         await message.save();
         await updateCache({ conversationId }, message);
-
+  
         // Store last message and unread count in the same Redis hash for the conversation
         const conversationInfoKey = `conversation:${conversationId}:info`;
-
+  
         // Store the last message and time
         await redisClient.hset(conversationInfoKey, "last_message", content);
         await redisClient.hset(
@@ -76,21 +76,28 @@ export const handleDMEvents = (socket, anthillChat) => {
           "last_message_time",
           new Date().toISOString()
         );
-
+  
         // Increment unread message count for the recipient
         await redisClient.hincrby(conversationInfoKey, `${recipientId}`, 1);
-
+  
         // Get updated unread count for the recipient
         const unreadCount = await redisClient.hget(
           conversationInfoKey,
           `${recipientId}`
         );
-
-        // Emit the unread count to the recipient
-        anthillChat
-          .to(recipientId)
-          .emit("unread_counts", { conversationId, count: unreadCount });
-
+  
+        // Emit the unread count to the recipient's room
+        const recipientRoom = `user:${recipientId}`;
+        anthillChat.to(recipientRoom).emit("unread_counts", {
+          conversationId,
+          count: unreadCount,
+          
+        });
+  
+        console.log(
+          `Unread count updated for recipient ${recipientId}: ${unreadCount}`
+        );
+  
         // Emit the message to the conversation (both sender and recipient)
         anthillChat.to(conversationId).emit("recived_dm", message);
       } catch (error) {
@@ -99,4 +106,5 @@ export const handleDMEvents = (socket, anthillChat) => {
       }
     }
   );
+  
 };
