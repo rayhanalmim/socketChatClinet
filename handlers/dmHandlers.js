@@ -12,9 +12,19 @@ import Employee from "#models/authModels/employeeModel.js";
 import redisClient from "./../redisClient.js";
 
 export const handleDMEvents = (socket, anthillChat) => {
+
+  let currentConversationId = null; 
+  
   socket.on("join_dm", async ({ conversationId }) => {
     try {
+      // If the user is already in a conversation, leave the previous one
+      if (currentConversationId && currentConversationId !== conversationId) {
+        socket.leave(currentConversationId);
+        anthillChat.to(currentConversationId).emit("user_left", { conversationId: currentConversationId });
+      }
+
       socket.join(conversationId);
+      currentConversationId = conversationId;  // Update to the new conversation
 
       const messages = await fetchMessages({ conversationId });
       socket.emit("private_message_history", messages);
@@ -103,5 +113,23 @@ export const handleDMEvents = (socket, anthillChat) => {
       }
     }
   );
+
+
+  socket.on('leave_dm', ({ conversationId }) => {
+    try {
+      // Remove the user from the current conversation room
+      socket.leave(conversationId);
+      console.log(`User has left the conversation: ${conversationId}`);
+
+      // Optionally, you can notify the other participant(s) that the user has left
+      anthillChat.to(conversationId).emit('user_left', { conversationId });
+
+      // Clear the current conversation ID to prevent sending typing indicators
+      currentConversationId = null;
+    } catch (error) {
+      console.error('Error leaving the DM conversation: ', error);
+      handleError(socket, error, 'Failed to leave the private conversation');
+    }
+  });
   
 };
