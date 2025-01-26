@@ -66,37 +66,34 @@ export const handleDMEvents = (socket, anthillChat) => {
         await message.save();
         await updateCache({ conversationId }, message);
   
-        // Store last message and unread count in the same Redis hash for the conversation
-        const conversationInfoKey = `conversation:${conversationId}:info`;
-  
-        // Store the last message and time
-        await redisClient.hset(conversationInfoKey, "last_message", content);
-        await redisClient.hset(
-          conversationInfoKey,
-          "last_message_time",
-          new Date().toISOString()
-        );
-  
-        // Increment unread message count for the recipient
-        await redisClient.hincrby(conversationInfoKey, `${recipientId}`, 1);
-  
-        // Get updated unread count for the recipient
-        const unreadCount = await redisClient.hget(
-          conversationInfoKey,
-          `${recipientId}`
-        );
-  
-        // Emit the unread count to the recipient's room
-        const recipientRoom = `user:${recipientId}`;
-        anthillChat.to(recipientRoom).emit("unread_counts", {
-          conversationId,
-          count: unreadCount,
-          
-        });
-  
-        console.log(
-          `Unread count updated for recipient ${recipientId}: ${unreadCount}`
-        );
+       // Store last message and unread count in the same Redis hash for the conversation
+       const conversationInfoKey = `conversation:${conversationId}:info`;
+
+       // Store the last message and time
+       const lastMessageTime = new Date().toISOString();
+       await redisClient.hset(conversationInfoKey, "last_message", content);
+       await redisClient.hset(conversationInfoKey, "last_message_time", lastMessageTime);
+ 
+       // Increment unread message count for the recipient
+       await redisClient.hincrby(conversationInfoKey, `${recipientId}`, 1);
+ 
+       // Get updated unread count for the recipient
+       const unreadCount = await redisClient.hget(conversationInfoKey, `${recipientId}`);
+ 
+       // Emit the unread count to the recipient's room in the correct format
+       const recipientRoom = `user:${recipientId}`;
+       
+       anthillChat.to(recipientRoom).emit("unread_counts", {
+         conversationId,
+         count: parseInt(unreadCount, 10),
+         lastMessage: content,
+         lastMessageTime,
+         isChannel: false, // Since this is a DM, it’s not a channel
+       });
+ 
+       console.log(
+         `Unread count updated for recipient ${recipientId}: ${unreadCount}`
+       );
   
         // Emit the message to the conversation (both sender and recipient)
         anthillChat.to(conversationId).emit("recived_dm", message);
