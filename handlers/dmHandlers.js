@@ -1,69 +1,73 @@
 /* eslint-disable no-undef */
-import mongoose from "mongoose";
-import Message from "#models/messages/messagesModel.js";
-import { createConversationId, fetchMessages, handleError } from "./utils.js";
-import { uploadBuffer } from "#config/space.js";
-import Employee from "#models/authModels/employeeModel.js";
-export const handleDMEvents = (socket, anthillChat) => {
-  socket.on("join_dm", async ({ conversationId }) => {
-    try {
-      socket.join(conversationId);
+import mongoose from 'mongoose';
+import Message from '#models/messages/messagesModel.js';
+import {
+  createConversationId,
+  fetchMessages,
+  handleError,
+  updateCache,
+} from './utils.js';
+import { uploadBuffer } from '#config/space.js';
+import Employee from '#models/authModels/employeeModel.js';
+import redisClient from './../redisClient.js';
 
-      console.log("user joined dm", conversationId);
+export const handleDMEvents = (socket, anthillChat) => {
+  let currentConversationId = null;
+
+  socket.on('join_dm', async ({ conversationId, userId }) => {
+    try {
+      if (!conversationId || !userId) {
+        throw new Error('Conversation ID and User ID are required');
+      }
+
+      // If the user is already in a conversation, leave the previous one
+      if (currentConversationId && currentConversationId !== conversationId) {
+        socket.leave(currentConversationId);
+      }
+
+      socket.join(conversationId);
+      currentConversationId = conversationId;
+
+      // Reset unread count when joining conversation
+      const conversationInfoKey = `conversation:${conversationId}:info`;
+      await redisClient.hset(conversationInfoKey, userId, '0');
+
       const messages = await fetchMessages({ conversationId });
-      console.log("messages", messages);
-      socket.emit("private_message_history", messages);
+      socket.emit('private_message_history', messages);
     } catch (error) {
-      handleError(socket, error, "Failed to join the private conversation");
+      handleError(socket, error, 'Failed to join the private conversation');
     }
   });
 
-  // Handle direct message with file upload
   socket.on(
-    "send_dm",
+    'send_dm',
     async ({ senderId, recipientId, content, attachmentData, messageType }) => {
       try {
-        // Validate user IDs
         if (
           !mongoose.Types.ObjectId.isValid(senderId) ||
           !mongoose.Types.ObjectId.isValid(recipientId)
         ) {
-          throw new Error("Invalid user IDs");
+          throw new Error('Invalid user IDs');
         }
 
-        console.log('attachment should be hit', attachmentData.attachment);
-
-        // Generate conversation ID
         const conversationId = createConversationId(senderId, recipientId);
-
         let attachmentUrl = null;
 
-        // Handle attachment (if provided)
-        if (attachmentData.attachment) {
-          console.log("Full attachment object:", attachmentData.attachment);
-
-          // Decode base64 string to buffer
-          const buffer = Buffer.from(attachmentData.attachment.data, "base64");
-        
-
-
-          // Upload file to DigitalOcean Spaces
+        if (attachmentData?.attachment) {
+          const buffer = Buffer.from(attachmentData.attachment.data, 'base64');
           const result = await uploadBuffer(
             attachmentData.filePath,
             buffer,
-            attachmentData.attachment.mimetype
+            attachmentData.attachment.mimetype,
           );
-
           attachmentUrl = result;
         }
 
-        // Retrieve sender's information
         const user = await Employee.findById(senderId);
         if (!user) {
-          throw new Error("Sender not found");
+          throw new Error('Sender not found');
         }
 
-        // Create and save the message
         const message = new Message({
           senderId,
           senderName: user.name,
@@ -72,16 +76,63 @@ export const handleDMEvents = (socket, anthillChat) => {
           content,
           messageType,
           conversationId,
-          attachment: attachmentUrl, // Save file URL (or null if no attachment)
+          attachment: attachmentUrl,
         });
-        await message.save();
 
-        // Emit the message to the conversation room
-        anthillChat.to(conversationId).emit("recived_dm", message);
+        await message.save();
+        await updateCache({ conversationId }, message);
+
+        // Store last message and unread count in Redis
+        const conversationInfoKey = `conversation:${conversationId}:info`;
+        const lastMessageTime = new Date().toISOString();
+
+        // Update last message info
+        await redisClient.hset(conversationInfoKey, 'last_message', content);
+        await redisClient.hset(
+          conversationInfoKey,
+          'last_message_time',
+          lastMessageTime,
+        );
+
+        // Increment unread count for recipient
+        await redisClient.hincrby(conversationInfoKey, recipientId, 1);
+
+        // Get updated unread count
+        const unreadCount = await redisClient.hget(
+          conversationInfoKey,
+          recipientId,
+        );
+
+        // Emit unread count to recipient's room
+        const recipientRoom = `user:${recipientId}`;
+        anthillChat.to(recipientRoom).emit('unread_counts', {
+          conversationId,
+          count: parseInt(unreadCount, 10),
+          lastMessage: content,
+          lastMessageTime,
+          isChannel: false,
+        });
+
+        // Emit the message to the conversation
+        anthillChat.to(conversationId).emit('recived_dm', message);
       } catch (error) {
-        console.error(error);
-        handleError(socket, error, "Failed to send the direct message");
+        handleError(socket, error, 'Failed to send the direct message');
       }
-    }
+    },
   );
+
+  socket.on('leave_dm', ({ conversationId }) => {
+    try {
+      if (!conversationId) {
+        throw new Error('Conversation ID is required');
+      }
+
+      socket.leave(conversationId);
+      currentConversationId = null;
+
+      console.log(`User has left the conversation: ${conversationId}`);
+    } catch (error) {
+      handleError(socket, error, 'Failed to leave the private conversation');
+    }
+  });
 };
