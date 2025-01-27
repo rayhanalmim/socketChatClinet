@@ -1,14 +1,41 @@
 import redisClient from "./../redisClient.js";
 
 export const handleUnreadMessages = (socket, anthillChat) => {
-  socket.on("message_read", async ({ userId, conversationId }) => {
+  socket.on("message_read", async ({ userId, conversationId, channelId }) => {
     try {
-      // Reset unread message count for the user in the DM conversation
-      const conversationInfoKey = `conversation:${conversationId}:info`;
-      await redisClient.hset(conversationInfoKey, `${userId}`, 0);
-      anthillChat
-        .to(userId)
-        .emit("unread_counts", { conversationId, count: 0 });
+      if (channelId) {
+        // Reset unread message count for the user in the channel
+        const channelInfoKey = `channel:${channelId}:info`;
+        await redisClient.hset(channelInfoKey, `${userId}`, 0);
+        
+        // Get latest channel info to emit
+        const lastMessage = await redisClient.hget(channelInfoKey, "last_message") || "No messages yet";
+        const lastMessageTime = await redisClient.hget(channelInfoKey, "last_message_time") || "N/A";
+        
+        anthillChat.to(userId).emit("unread_counts", { 
+          channelId, 
+          count: 0,
+          lastMessage,
+          lastMessageTime,
+          isChannel: true 
+        });
+      } else if (conversationId) {
+        // Reset unread message count for the user in the DM conversation
+        const conversationInfoKey = `conversation:${conversationId}:info`;
+        await redisClient.hset(conversationInfoKey, `${userId}`, 0);
+        
+        // Get latest conversation info to emit
+        const lastMessage = await redisClient.hget(conversationInfoKey, "last_message") || "No messages yet";
+        const lastMessageTime = await redisClient.hget(conversationInfoKey, "last_message_time") || "N/A";
+        
+        anthillChat.to(userId).emit("unread_counts", { 
+          conversationId, 
+          count: 0,
+          lastMessage,
+          lastMessageTime,
+          isChannel: false 
+        });
+      }
     } catch (error) {
       console.error("Failed to reset unread message count:", error);
     }

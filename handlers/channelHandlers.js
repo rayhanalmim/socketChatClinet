@@ -102,31 +102,40 @@ export const handleChannelEvents = (socket, anthillChat) => {
         await message.save();
         await updateCache({ channelId }, message);
 
+        // Update channel info in Redis
+        const channelInfoKey = `channel:${channelId}:info`;
+        
+        // Store last message and time
+        const lastMessageTime = new Date().toISOString();
+        await redisClient.hset(channelInfoKey, 'last_message', content);
+        await redisClient.hset(channelInfoKey, 'last_message_time', lastMessageTime);
+
         const channelMembers = await ChannelUser.find({ channelId });
         for (const member of channelMembers) {
           if (member.userId.toString() !== userId) {
+            // Increment unread count for each member except sender
             await redisClient.hincrby(
-              `unread:${channelId}`,
+              channelInfoKey,
               member.userId.toString(),
-              1,
+              1
             );
+            
+            // Get updated unread count
             const unreadCount = await redisClient.hget(
-              `unread:${channelId}`,
-              member.userId.toString(),
+              channelInfoKey,
+              member.userId.toString()
             );
-            anthillChat
-              .to(member.userId.toString())
-              .emit('unread_counts', { channelId, count: unreadCount });
+
+            // Emit unread count update to member
+            anthillChat.to(member.userId.toString()).emit('unread_counts', {
+              channelId,
+              count: parseInt(unreadCount, 10),
+              lastMessage: content,
+              lastMessageTime,
+              isChannel: true
+            });
           }
         }
-
-        // Store last message and time in Redis for the channel
-        await redisClient.hset(`last_message:${channelId}`, 'message', content);
-        await redisClient.hset(
-          `last_message:${channelId}`,
-          'time',
-          new Date().toISOString(),
-        );
 
         anthillChat.to(channelId).emit('receive_message', message);
         console.log(`Message sent in channel ${channelId} by ${userId}`);
