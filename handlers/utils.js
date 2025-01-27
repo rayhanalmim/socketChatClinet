@@ -77,37 +77,60 @@ export const handleUtilityEvents = (socket, anthillChat) => {
     }
   });
 
-  socket.on('edit_message', async ({ messageId, newContent, userId }) => {
+  socket.on('edit_message', async ({ messageId, newContent, userId, channelId, conversationId }) => {
     try {
-      if (!mongoose.Types.ObjectId.isValid(messageId)) {
+      // Validate messageId
+      if (!messageId || !mongoose.Types.ObjectId.isValid(messageId)) {
         throw new Error('Invalid Message ID');
       }
-
-      const message = await Message.findById(messageId);
+  
+      // Find message using both channelId and conversationId
+      const query = {
+        _id: messageId,
+        ...(channelId ? { channelId } : {}),
+        ...(conversationId ? { conversationId } : {})
+      };
+  
+      const message = await Message.findOne(query);
+      
       if (!message) {
         throw new Error('Message not found');
       }
-
+  
       if (message.senderId.toString() !== userId) {
         throw new Error('Unauthorized: You can only edit your own messages');
       }
-
-      //user cant edit message after 1 hour of creation
+  
       const oneHour = 60 * 60 * 1000;
       if (new Date() - new Date(message.createdAt) > oneHour) {
-        throw new Error('You cannot edit the message after 1 hour of creation');
+        throw new Error('You cannot edit messages older than 1 hour');
       }
-
+  
       message.content = newContent;
       message.edited = true;
       await message.save();
-
-      anthillChat.to(message.channelId).emit('message_edited', {
+  
+      // Update Redis cache
+      const filter = channelId ? { channelId } : { conversationId };
+      const cacheKey = JSON.stringify(filter);
+      const cachedMessages = await redisClient.get(cacheKey);
+  
+      if (cachedMessages) {
+        const messages = JSON.parse(cachedMessages);
+        const updatedMessages = messages.map(msg => 
+          msg._id === messageId ? { ...msg, content: newContent, edited: true } : msg
+        );
+        await redisClient.set(cacheKey, JSON.stringify(updatedMessages), 'EX', 60 * 5);
+      }
+  
+      // Emit to the appropriate room
+      const room = channelId || conversationId;
+      anthillChat.to(room).emit('message_edited', {
         messageId,
         newContent,
+        edited: true
       });
-
-      console.log(`Message ${messageId} edited by user ${userId}`);
+  
     } catch (error) {
       handleError(socket, error, 'Failed to edit the message');
     }
