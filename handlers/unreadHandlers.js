@@ -73,6 +73,8 @@ export const handleUnreadMessages = (socket, anthillChat) => {
   
         console.log("Fetched unread counts for direct messages:", unreadCounts);
       }
+
+      socket.emit
   
       socket.emit("unread_counts", unreadCounts);
   
