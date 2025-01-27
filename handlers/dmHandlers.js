@@ -86,7 +86,7 @@ export const handleDMEvents = (socket, anthillChat) => {
         const conversationInfoKey = `conversation:${conversationId}:info`;
         const lastMessageTime = new Date().toISOString();
 
-        // Update last message info
+        // Update last message info for all users
         await redisClient.hset(conversationInfoKey, 'last_message', content);
         await redisClient.hset(
           conversationInfoKey,
@@ -94,26 +94,41 @@ export const handleDMEvents = (socket, anthillChat) => {
           lastMessageTime,
         );
 
-        // Increment unread count for recipient
-        await redisClient.hincrby(conversationInfoKey, recipientId, 1);
-
-        // Get updated unread count
-        const unreadCount = await redisClient.hget(
-          conversationInfoKey,
-          recipientId,
-        );
-
-        // Emit unread count to recipient's room
-        const recipientRoom = `user:${recipientId}`;
-        anthillChat.to(recipientRoom).emit('unread_counts', {
+        // Emit last message update to all users
+        anthillChat.emit('unread_counts', {
           conversationId,
-          count: parseInt(unreadCount, 10),
+          count: 0,
           lastMessage: content,
           lastMessageTime,
           isChannel: false,
+          senderId
         });
 
-        // Emit the message to the conversation
+        // Check if recipient is in the conversation
+        const recipientSocket = Array.from(await anthillChat.in(conversationId).allSockets());
+        const isRecipientInConversation = recipientSocket.some(socketId => 
+          anthillChat.sockets.get(socketId)?.rooms.has(`user:${recipientId}`)
+        );
+
+        // Only increment unread count if recipient is not in the conversation
+        if (!isRecipientInConversation) {
+          await redisClient.hincrby(conversationInfoKey, recipientId, 1);
+          const unreadCount = await redisClient.hget(
+            conversationInfoKey,
+            recipientId,
+          );
+
+          const recipientRoom = `user:${recipientId}`;
+          anthillChat.to(recipientRoom).emit('unread_counts', {
+            conversationId,
+            count: parseInt(unreadCount, 10),
+            lastMessage: content,
+            lastMessageTime,
+            isChannel: false,
+            senderId
+          });
+        }
+
         anthillChat.to(conversationId).emit('recived_dm', message);
       } catch (error) {
         handleError(socket, error, 'Failed to send the direct message');

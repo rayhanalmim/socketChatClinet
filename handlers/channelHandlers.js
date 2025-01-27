@@ -109,46 +109,60 @@ export const handleChannelEvents = (socket, anthillChat) => {
 
         // Update channel info in Redis
         const channelInfoKey = `channel:${channelId}:info`;
-
-        // Store last message and time
         const lastMessageTime = new Date().toISOString();
+        
+        // Update last message for all users
         await redisClient.hset(channelInfoKey, 'last_message', content);
-        await redisClient.hset(
-          channelInfoKey,
-          'last_message_time',
+        await redisClient.hset(channelInfoKey, 'last_message_time', lastMessageTime);
+
+        // Emit last message update to all users
+        anthillChat.emit('unread_counts', {
+          channelId,
+          count: 0,
+          lastMessage: content,
           lastMessageTime,
-        );
+          isChannel: true,
+          senderId: userId // Add sender ID to identify current user's message
+        });
 
         const channelMembers = await ChannelUser.find({ channelId });
         for (const member of channelMembers) {
           if (member.userId.toString() !== userId) {
             const memberRoom = `user:${member.userId}`;
-            // Increment unread count for each member except sender
-            await redisClient.hincrby(
-              channelInfoKey,
-              member.userId.toString(),
-              1,
+            
+            // Check if member is in the channel
+            const memberSocket = Array.from(await anthillChat.in(channelId).allSockets());
+            const isMemberInChannel = memberSocket.some(socketId => 
+              anthillChat.sockets.get(socketId)?.rooms.has(`user:${member.userId}`)
             );
 
-            // Get updated unread count
-            const unreadCount = await redisClient.hget(
-              channelInfoKey,
-              member.userId.toString(),
-            );
+            // Only increment unread count if member is not in the channel
+            if (!isMemberInChannel) {
+              await redisClient.hincrby(
+                channelInfoKey,
+                member.userId.toString(),
+                1,
+              );
 
-            // Emit unread count update to member's room
-            anthillChat.to(memberRoom).emit('unread_counts', {
-              channelId,
-              count: parseInt(unreadCount, 10),
-              lastMessage: content,
-              lastMessageTime,
-              isChannel: true,
-            });
+              const unreadCount = await redisClient.hget(
+                channelInfoKey,
+                member.userId.toString(),
+              );
+
+              // Emit unread count update to member's room
+              anthillChat.to(memberRoom).emit('unread_counts', {
+                channelId,
+                count: parseInt(unreadCount, 10),
+                lastMessage: content,
+                lastMessageTime,
+                isChannel: true,
+                senderId: userId
+              });
+            }
           }
         }
 
         anthillChat.to(channelId).emit('receive_message', message);
-        console.log(`Message sent in channel ${channelId} by ${userId}`);
       } catch (error) {
         handleError(socket, error, 'Failed to send the message');
       }
