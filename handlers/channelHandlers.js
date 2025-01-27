@@ -25,13 +25,18 @@ export const handleChannelEvents = (socket, anthillChat) => {
         throw new Error('You are not a member of this channel');
       }
 
+      // Leave all previous rooms except user's own room
       socket.rooms.forEach((room) => {
-        if (room !== socket.id) {
+        if (room !== socket.id && room !== `user:${userId}`) {
           socket.leave(room);
         }
       });
 
       socket.join(channelId);
+
+      // Reset unread count when joining channel
+      const channelInfoKey = `channel:${channelId}:info`;
+      await redisClient.hset(channelInfoKey, userId, '0');
 
       const messages = await fetchMessages({ channelId });
       socket.emit('message_history', messages);
@@ -104,35 +109,40 @@ export const handleChannelEvents = (socket, anthillChat) => {
 
         // Update channel info in Redis
         const channelInfoKey = `channel:${channelId}:info`;
-        
+
         // Store last message and time
         const lastMessageTime = new Date().toISOString();
         await redisClient.hset(channelInfoKey, 'last_message', content);
-        await redisClient.hset(channelInfoKey, 'last_message_time', lastMessageTime);
+        await redisClient.hset(
+          channelInfoKey,
+          'last_message_time',
+          lastMessageTime,
+        );
 
         const channelMembers = await ChannelUser.find({ channelId });
         for (const member of channelMembers) {
           if (member.userId.toString() !== userId) {
+            const memberRoom = `user:${member.userId}`;
             // Increment unread count for each member except sender
             await redisClient.hincrby(
               channelInfoKey,
               member.userId.toString(),
-              1
+              1,
             );
-            
+
             // Get updated unread count
             const unreadCount = await redisClient.hget(
               channelInfoKey,
-              member.userId.toString()
+              member.userId.toString(),
             );
 
-            // Emit unread count update to member
-            anthillChat.to(member.userId.toString()).emit('unread_counts', {
+            // Emit unread count update to member's room
+            anthillChat.to(memberRoom).emit('unread_counts', {
               channelId,
               count: parseInt(unreadCount, 10),
               lastMessage: content,
               lastMessageTime,
-              isChannel: true
+              isChannel: true,
             });
           }
         }

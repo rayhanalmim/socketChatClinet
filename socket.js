@@ -14,7 +14,7 @@ const socketHandler = (io) => {
     handleDMEvents(socket, anthillChat);
     handleUtilityEvents(socket, anthillChat);
     handleTyping(socket, anthillChat);
-    handleUnreadMessages(socket); // Remove anthillChat as it's not used
+    handleUnreadMessages(socket, anthillChat);
   });
 };
 
