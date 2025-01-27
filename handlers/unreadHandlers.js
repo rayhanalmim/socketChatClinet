@@ -18,48 +18,23 @@ export const handleUnreadMessages = (socket, anthillChat) => {
     try {
       const userRoom = `user:${userId}`;
       socket.join(userRoom);
-
+  
       const unreadCounts = [];
-
-      // Fetch unread counts for DM conversations
-      const conversationKeys = await redisClient.keys(`conversation:*:info`);
-      const conversationIds = conversationKeys.map((key) => key.split(":")[1]);
-
-      for (const conversationId of conversationIds) {
-        const conversationInfoKey = `conversation:${conversationId}:info`;
-        const unreadCount =
-          (await redisClient.hget(conversationInfoKey, `${userId}`)) || 0;
-
-        const lastMessage =
-          (await redisClient.hget(conversationInfoKey, "last_message")) ||
-          "No messages yet";
-
-        const lastMessageTime =
-          (await redisClient.hget(conversationInfoKey, "last_message_time")) ||
-          "N/A";
-
-        unreadCounts.push({
-          conversationId,
-          count: parseInt(unreadCount, 10),
-          lastMessage,
-          lastMessageTime,
-          isChannel: false,
-        });
-      }
-
-      // Fetch unread counts for group channels
+  
+      // If a channelId is provided, only fetch unread counts for the channel
       if (channelId) {
         const channelKey = `channel:${channelId}:info`;
+  
         const unreadCount =
           (await redisClient.hget(channelKey, `${userId}`)) || 0;
-
+  
         const lastMessage =
           (await redisClient.hget(channelKey, "last_message")) ||
           "No messages yet";
-
+  
         const lastMessageTime =
           (await redisClient.hget(channelKey, "last_message_time")) || "N/A";
-
+  
         unreadCounts.push({
           channelId,
           count: parseInt(unreadCount, 10),
@@ -67,15 +42,48 @@ export const handleUnreadMessages = (socket, anthillChat) => {
           lastMessageTime,
           isChannel: true,
         });
+  
+        console.log("Fetched unread counts for channel:", unreadCounts);
+      } else {
+        // If no channelId is provided, fetch unread counts for direct messages
+        const conversationKeys = await redisClient.keys(`conversation:*:info`);
+        const conversationIds = conversationKeys.map((key) => key.split(":")[1]);
+  
+        for (const conversationId of conversationIds) {
+          const conversationInfoKey = `conversation:${conversationId}:info`;
+          const unreadCount =
+            (await redisClient.hget(conversationInfoKey, `${userId}`)) || 0;
+  
+          const lastMessage =
+            (await redisClient.hget(conversationInfoKey, "last_message")) ||
+            "No messages yet";
+  
+          const lastMessageTime =
+            (await redisClient.hget(conversationInfoKey, "last_message_time")) ||
+            "N/A";
+  
+          unreadCounts.push({
+            conversationId,
+            count: parseInt(unreadCount, 10),
+            lastMessage,
+            lastMessageTime,
+            isChannel: false,
+          });
+        }
+  
+        console.log("Fetched unread counts for direct messages:", unreadCounts);
       }
-
+  
       socket.emit("unread_counts", unreadCounts);
-
+  
       console.log(
-        `Fetched unread counts for user ${userId} with channelId ${channelId}`
+        `Fetched unread counts for user ${userId} ${
+          channelId ? `in channel ${channelId}` : "for direct messages"
+        }`
       );
     } catch (error) {
       console.error("Failed to fetch unread message counts:", error);
     }
   });
+  
 };
