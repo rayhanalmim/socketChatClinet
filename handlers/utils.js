@@ -11,16 +11,36 @@ export const fetchMessages = async (filter, limit = 50) => {
 
   if (cachedMessages) {
     console.log('redis message');
-    return JSON.parse(cachedMessages);
+    const messages = JSON.parse(cachedMessages);
+
+    // Ensure that each message includes its reactions
+    for (let msg of messages) {
+      const reactions = await getReactions(msg._id); // Fetch reactions for the message
+      msg.reactions = reactions;  // Attach reactions to the message
+    }
+
+    return messages;
   }
 
+  // Fetch messages from the database if not in cache
   const messages = await Message.find(filter)
     .sort({ createdAt: -1 })
     .limit(limit);
-  await redisClient.set(cacheKey, JSON.stringify(messages), 'EX', 60 * 5); // Cache for 5 minutes
+
+  // Fetch reactions for each message from the database
+  for (let msg of messages) {
+    const reactions = await getReactions(msg._id);
+    msg.reactions = reactions;  // Attach reactions to the message
+  }
+
+  // Cache the messages with reactions for 5 minutes
+  await redisClient.set(cacheKey, JSON.stringify(messages), 'EX', 60 * 5);
 
   return messages;
 };
+
+
+
 
 export const updateCache = async (filter, newMessage, limit = 50) => {
   console.log('updating cache');
@@ -28,14 +48,29 @@ export const updateCache = async (filter, newMessage, limit = 50) => {
   const cachedMessages = await redisClient.get(cacheKey);
 
   let messages = cachedMessages ? JSON.parse(cachedMessages) : [];
-  messages.unshift(newMessage); // Add new message to the beginning
+
+  // Fetch reactions for the new message and add them
+  const reactions = await getReactions(newMessage._id); // Fetch reactions for the new message
+  newMessage.reactions = reactions;  // Attach reactions to the new message
+
+  messages.unshift(newMessage); // Add the new message to the beginning
 
   if (messages.length > limit) {
     messages.pop(); // Remove the oldest message if cache size exceeds limit
   }
 
+  // Update the cache with the new message and its reactions
   await redisClient.set(cacheKey, JSON.stringify(messages), 'EX', 60 * 5); // Cache for 5 minutes
 };
+
+
+const getReactions = async (messageId) => {
+  // Fetch reactions for the message (assuming they're stored in a separate collection)
+  const message = await Message.findById(messageId);
+  return message ? message.reactions : [];
+};
+
+
 
 export const handleError = (socket, error, clientMessage) => {
   console.error(clientMessage, error);

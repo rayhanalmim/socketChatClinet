@@ -167,6 +167,8 @@ export const handleChannelEvents = (socket, anthillChat) => {
           }
         }
 
+        console.log("chenck the message", message);
+
         anthillChat.to(channelId).emit('receive_message', message);
         console.log(`Message sent in channel ${channelId} by ${userId}`);
       } catch (error) {
