@@ -1,23 +1,23 @@
 /* eslint-disable no-undef */
-import mongoose from 'mongoose';
-import Message from '#models/messages/messagesModel.js';
+import mongoose from "mongoose";
+import Message from "#models/messages/messagesModel.js";
 import {
   createConversationId,
   fetchMessages,
   handleError,
   updateCache,
-} from './utils.js';
-import { uploadBuffer } from '#config/space.js';
-import Employee from '#models/authModels/employeeModel.js';
-import redisClient from './../redisClient.js';
+} from "./utils.js";
+import { uploadBuffer } from "#config/space.js";
+import Employee from "#models/authModels/employeeModel.js";
+import redisClient from "./../redisClient.js";
 
 export const handleDMEvents = (socket, anthillChat) => {
   let currentConversationId = null;
 
-  socket.on('join_dm', async ({ conversationId, userId }) => {
+  socket.on("join_dm", async ({ conversationId, userId }) => {
     try {
       if (!conversationId || !userId) {
-        throw new Error('Conversation ID and User ID are required');
+        throw new Error("Conversation ID and User ID are required");
       }
 
       // If the user is already in a conversation, leave the previous one
@@ -25,47 +25,54 @@ export const handleDMEvents = (socket, anthillChat) => {
         socket.leave(currentConversationId);
       }
 
+      // Leave all other rooms except the user's own room
+      socket.rooms.forEach((room) => {
+        if (room !== socket.id && room !== `user:${userId}`) {
+          socket.leave(room);
+        }
+      });
+
       socket.join(conversationId);
       currentConversationId = conversationId;
 
       // Reset unread count when joining conversation
       const conversationInfoKey = `conversation:${conversationId}:info`;
-      await redisClient.hset(conversationInfoKey, userId, '0');
+      await redisClient.hset(conversationInfoKey, userId, "0");
 
       const messages = await fetchMessages({ conversationId });
-      socket.emit('private_message_history', messages);
+      socket.emit("private_message_history", messages);
     } catch (error) {
-      handleError(socket, error, 'Failed to join the private conversation');
+      handleError(socket, error, "Failed to join the private conversation");
     }
   });
 
   socket.on(
-    'send_dm',
+    "send_dm",
     async ({ senderId, recipientId, content, attachmentData, messageType }) => {
       try {
         if (
           !mongoose.Types.ObjectId.isValid(senderId) ||
           !mongoose.Types.ObjectId.isValid(recipientId)
         ) {
-          throw new Error('Invalid user IDs');
+          throw new Error("Invalid user IDs");
         }
 
         const conversationId = createConversationId(senderId, recipientId);
         let attachmentUrl = null;
 
         if (attachmentData?.attachment) {
-          const buffer = Buffer.from(attachmentData.attachment.data, 'base64');
+          const buffer = Buffer.from(attachmentData.attachment.data, "base64");
           const result = await uploadBuffer(
             attachmentData.filePath,
             buffer,
-            attachmentData.attachment.mimetype,
+            attachmentData.attachment.mimetype
           );
           attachmentUrl = result;
         }
 
         const user = await Employee.findById(senderId);
         if (!user) {
-          throw new Error('Sender not found');
+          throw new Error("Sender not found");
         }
 
         const message = new Message({
@@ -87,11 +94,11 @@ export const handleDMEvents = (socket, anthillChat) => {
         const lastMessageTime = new Date().toISOString();
 
         // Update last message info
-        await redisClient.hset(conversationInfoKey, 'last_message', content);
+        await redisClient.hset(conversationInfoKey, "last_message", content);
         await redisClient.hset(
           conversationInfoKey,
-          'last_message_time',
-          lastMessageTime,
+          "last_message_time",
+          lastMessageTime
         );
 
         // Increment unread count for recipient
@@ -100,12 +107,12 @@ export const handleDMEvents = (socket, anthillChat) => {
         // Get updated unread count
         const unreadCount = await redisClient.hget(
           conversationInfoKey,
-          recipientId,
+          recipientId
         );
 
         // Emit unread count to recipient's room
         const recipientRoom = `user:${recipientId}`;
-        anthillChat.to(recipientRoom).emit('unread_counts', {
+        anthillChat.to(recipientRoom).emit("unread_counts", {
           conversationId,
           count: parseInt(unreadCount, 10),
           lastMessage: content,
@@ -114,17 +121,17 @@ export const handleDMEvents = (socket, anthillChat) => {
         });
 
         // Emit the message to the conversation
-        anthillChat.to(conversationId).emit('recived_dm', message);
+        anthillChat.to(conversationId).emit("recived_dm", message);
       } catch (error) {
-        handleError(socket, error, 'Failed to send the direct message');
+        handleError(socket, error, "Failed to send the direct message");
       }
-    },
+    }
   );
 
-  socket.on('leave_dm', ({ conversationId }) => {
+  socket.on("leave_dm", ({ conversationId }) => {
     try {
       if (!conversationId) {
-        throw new Error('Conversation ID is required');
+        throw new Error("Conversation ID is required");
       }
 
       socket.leave(conversationId);
@@ -132,7 +139,7 @@ export const handleDMEvents = (socket, anthillChat) => {
 
       console.log(`User has left the conversation: ${conversationId}`);
     } catch (error) {
-      handleError(socket, error, 'Failed to leave the private conversation');
+      handleError(socket, error, "Failed to leave the private conversation");
     }
   });
 };
