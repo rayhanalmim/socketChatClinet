@@ -43,39 +43,39 @@ export const handleError = (socket, error, clientMessage) => {
 };
 
 export const handleUtilityEvents = (socket, anthillChat) => {
-  socket.on('add_reaction', async ({ messageId, reaction, userId }) => {
-    try {
-      if (!mongoose.Types.ObjectId.isValid(messageId)) {
-        throw new Error('Invalid Message ID');
-      }
+  // socket.on('add_reaction', async ({ messageId, reaction, userId }) => {
+  //   try {
+  //     if (!mongoose.Types.ObjectId.isValid(messageId)) {
+  //       throw new Error('Invalid Message ID');
+  //     }
 
-      const message = await Message.findById(messageId);
-      if (!message) {
-        throw new Error('Message not found');
-      }
+  //     const message = await Message.findById(messageId);
+  //     if (!message) {
+  //       throw new Error('Message not found');
+  //     }
 
-      const existingReaction = message.reactions.find(
-        (r) => r.userId.toString() === userId && r.reaction === reaction,
-      );
+  //     const existingReaction = message.reactions.find(
+  //       (r) => r.userId.toString() === userId && r.reaction === reaction,
+  //     );
 
-      if (existingReaction) {
-        message.reactions = message.reactions.filter(
-          (r) => !(r.userId.toString() === userId && r.reaction === reaction),
-        );
-      } else {
-        message.reactions.push({ userId, reaction });
-      }
+  //     if (existingReaction) {
+  //       message.reactions = message.reactions.filter(
+  //         (r) => !(r.userId.toString() === userId && r.reaction === reaction),
+  //       );
+  //     } else {
+  //       message.reactions.push({ userId, reaction });
+  //     }
 
-      await message.save();
+  //     await message.save();
 
-      anthillChat.to(message.channelId).emit('reaction_updated', {
-        messageId,
-        reactions: message.reactions,
-      });
-    } catch (error) {
-      handleError(socket, error, 'Failed to add reaction to the message');
-    }
-  });
+  //     anthillChat.to(message.channelId).emit('reaction_updated', {
+  //       messageId,
+  //       reactions: message.reactions,
+  //     });
+  //   } catch (error) {
+  //     handleError(socket, error, 'Failed to add reaction to the message');
+  //   }
+  // });
 
   socket.on('edit_message', async ({ messageId, newContent, userId, channelId, conversationId }) => {
     try {

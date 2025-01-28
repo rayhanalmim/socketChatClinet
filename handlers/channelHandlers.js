@@ -20,7 +20,10 @@ export const handleChannelEvents = (socket, anthillChat) => {
         throw new Error("Channel not found");
       }
 
+      console.log("from user join",channelId, userId);
+
       const channelUser = await ChannelUser.findOne({ channelId, userId });
+      
       if (!channelUser) {
         throw new Error("You are not a member of this channel");
       }
