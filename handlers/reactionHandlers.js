@@ -1,4 +1,5 @@
 import Message from "#models/messages/messagesModel.js";
+import e from "express";
 import redisClient from "../redisClient.js";
 
 export const handleReactions = (socket, anthillChat) => {
@@ -41,26 +42,27 @@ export const handleReactions = (socket, anthillChat) => {
 
       // Emit the updated reactions to the roomf
 
-      console.log(message)
-      console.log(message.channelId)
-      console.log(message.channelId.toString())
+      console.log(message);
+      if (message.channelId) {
+        console.log(message.channelId);
+      console.log(message.channelId.toString());
+      }else{ 
+        console.log(message.conversationId);
+      }
+      
 
       if (message.channelId) {
-        if (message.channelId) {
-          console.log(`Emitting to room: ${message.channelId.toString()}`);
-          anthillChat.to(message.channelId.toString()).emit("reaction_updated", {
-            messageId,
-            reactions: message.reactions,
-          });
-        } else {
-          console.error("No channelId found for the message.");
-        }
-        
-      } else {
-        anthillChat.to(message.conversationId.toString()).emit("reaction_updated", {
+        anthillChat.to(message.channelId.toString()).emit("reaction_updated", {
           messageId,
           reactions: message.reactions,
         });
+      } else {
+        anthillChat
+          .to(message.conversationId.toString())
+          .emit("reaction_updated", {
+            messageId,
+            reactions: message.reactions,
+          });
       }
 
       console.log(`Reaction added for message ${messageId} by ${userId}`);
@@ -74,12 +76,12 @@ export const handleReactions = (socket, anthillChat) => {
   socket.on("remove_reaction", async ({ messageId, emoji, userId }) => {
     try {
       const message = await Message.findById(messageId);
-  
+
       if (!message) {
         socket.emit("error", { message: "Message not found" });
         return;
       }
-  
+
       // Filter out the reaction from the reactions array
       message.reactions = message.reactions.filter(
         (reaction) =>
@@ -87,9 +89,9 @@ export const handleReactions = (socket, anthillChat) => {
             reaction.userId.toString() === userId && reaction.reaction === emoji
           )
       );
-  
+
       await message.save();
-  
+
       // Update Redis after removing the reaction
       const messageKey = `message:${messageId}`;
       if (message.reactions.length > 0) {
@@ -102,7 +104,7 @@ export const handleReactions = (socket, anthillChat) => {
         // If no reactions are left, remove the key from Redis
         await redisClient.hdel(messageKey, "reactions");
       }
-  
+
       // Emit the updated reactions to the room
       anthillChat
         .to(message.channelId.toString() || message.conversationId.toString())
@@ -110,12 +112,11 @@ export const handleReactions = (socket, anthillChat) => {
           messageId,
           reactions: message.reactions,
         });
-  
+
       console.log(`Reaction removed for message ${messageId} by ${userId}`);
     } catch (error) {
       console.error("Error removing reaction:", error);
       socket.emit("error", { message: "Unable to remove reaction" });
     }
   });
-  
 };
