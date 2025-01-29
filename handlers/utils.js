@@ -170,4 +170,39 @@ export const handleUtilityEvents = (socket, anthillChat) => {
       handleError(socket, error, 'Failed to edit the message');
     }
   });
+
+  socket.on("mark_message_seen", async ({ channelId, userId, messageId }) => {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(channelId) || !mongoose.Types.ObjectId.isValid(messageId)) {
+        throw new Error("Invalid Channel ID or Message ID");
+      }
+  
+      const message = await Message.findById(messageId);
+      if (!message) {
+        throw new Error("Message not found");
+      }
+  
+      // Add user to seenBy array if not already there
+      if (!message.seenBy.includes(userId)) {
+        message.seenBy.push(userId);
+        await message.save();
+  
+        // Update Redis
+        const messageSeenKey = `message:${messageId}:seenBy`;
+        await redisClient.sadd(messageSeenKey, userId);
+  
+        // Fetch seen user details
+        const seenUsers = await Employee.find({ _id: { $in: message.seenBy } }, "name _id");
+  
+        // Emit seen update to all members in the channel
+        anthillChat.to(channelId).emit("message_seen_update", {
+          messageId,
+          seenUsers,
+        });
+      }
+    } catch (error) {
+      handleError(socket, error, "Failed to mark message as seen");
+    }
+  });
+  
 };

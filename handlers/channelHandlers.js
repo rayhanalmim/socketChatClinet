@@ -44,6 +44,14 @@ export const handleChannelEvents = (socket, anthillChat) => {
       const messages = await fetchMessages({ channelId });
       socket.emit("message_history", messages);
 
+      for (const message of messages) {
+        const seenUsers = await Employee.find({ _id: { $in: message.seenBy } }, "name _id");
+        socket.emit("message_seen_update", {
+          messageId: message._id,
+          seenUsers,
+        });
+      }
+
       console.warn("user is joining channel");
 
       anthillChat
@@ -107,6 +115,7 @@ export const handleChannelEvents = (socket, anthillChat) => {
           content,
           messageType,
           attachment: attachmentUrl,
+          seenBy: []  
         });
 
         await message.save();

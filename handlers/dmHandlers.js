@@ -16,6 +16,8 @@ export const handleDMEvents = (socket, anthillChat) => {
 
   socket.on("join_dm", async ({ conversationId, userId }) => {
     try {
+
+      console.log("fron join dm", conversationId, userId);
       if (!conversationId || !userId) {
         throw new Error("Conversation ID and User ID are required");
       }
