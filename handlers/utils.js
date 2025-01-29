@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Message from '#models/messages/messagesModel.js';
 import redisClient from '../redisClient.js';
+import Employee from '#models/authModels/employeeModel.js';
 
 export const createConversationId = (user1, user2) =>
   [user1, user2].sort().join('_');
@@ -176,8 +177,12 @@ export const handleUtilityEvents = (socket, anthillChat) => {
       if (!mongoose.Types.ObjectId.isValid(channelId) || !mongoose.Types.ObjectId.isValid(messageId)) {
         throw new Error("Invalid Channel ID or Message ID");
       }
+
+      console.log("mark_message_seen", channelId, userId, messageId);
   
       const message = await Message.findById(messageId);
+
+      console.log(message)
       if (!message) {
         throw new Error("Message not found");
       }
@@ -193,12 +198,16 @@ export const handleUtilityEvents = (socket, anthillChat) => {
   
         // Fetch seen user details
         const seenUsers = await Employee.find({ _id: { $in: message.seenBy } }, "name _id");
+
+        console.log("channelId", channelId);
+        console.log("seen user : ", seenUsers);
   
         // Emit seen update to all members in the channel
         anthillChat.to(channelId).emit("message_seen_update", {
           messageId,
           seenUsers,
         });
+        console.log("seen meesege boardcasted");
       }
     } catch (error) {
       handleError(socket, error, "Failed to mark message as seen");
