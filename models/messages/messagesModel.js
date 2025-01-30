@@ -61,16 +61,17 @@ const messageSchema = new Schema(
       ],
       default: [],
     },
-    // Seen by users
     seenBy: {
       type: [
         {
-          type: Schema.Types.ObjectId,
-          ref: "User",
+          _id: String,
+          name: String,
+          dp: String,
         },
       ],
       default: [],
     },
+    
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt fields
@@ -80,8 +81,7 @@ const messageSchema = new Schema(
 // Compound indexes for optimized queries
 messageSchema.index({ channelId: 1, createdAt: -1 }); // For channel messages
 messageSchema.index({ conversationId: 1, createdAt: -1 }); // For direct messages
-messageSchema.index({ 'reactions.userId': 1, 'reactions.reaction': 1 });
+messageSchema.index({ "reactions.userId": 1, "reactions.reaction": 1 });
 messageSchema.index({ seenBy: 1 });
-
 
 export default model("Message", messageSchema);
